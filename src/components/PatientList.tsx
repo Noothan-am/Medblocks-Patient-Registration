@@ -3,6 +3,7 @@ import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import type { Patient } from "../lib/db";
 import { db } from "../lib/db";
+import { usePGliteContext } from "../context/PGliteContext";
 
 interface PatientListProps {
   onPatientDelete?: (patientId: number) => void;
@@ -15,8 +16,15 @@ export const PatientList: React.FC<PatientListProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const {
+    isInitialized,
+    isLoading: isDbLoading,
+    error: dbError,
+  } = usePGliteContext();
 
   const loadPatients = async () => {
+    if (!isInitialized) return;
+
     try {
       setIsLoading(true);
       const data = await db.getPatients();
@@ -31,8 +39,10 @@ export const PatientList: React.FC<PatientListProps> = ({
   };
 
   useEffect(() => {
-    loadPatients();
-  }, []);
+    if (isInitialized) {
+      loadPatients();
+    }
+  }, [isInitialized]);
 
   const handleDelete = async (patientId: number) => {
     if (!window.confirm("Are you sure you want to delete this patient?")) {
@@ -59,7 +69,7 @@ export const PatientList: React.FC<PatientListProps> = ({
     );
   });
 
-  if (isLoading) {
+  if (isDbLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -67,11 +77,15 @@ export const PatientList: React.FC<PatientListProps> = ({
     );
   }
 
-  if (error) {
+  if (dbError) {
     return (
       <div className="text-center p-4">
-        <p className="text-red-600">{error}</p>
-        <Button variant="secondary" onClick={loadPatients} className="mt-4">
+        <p className="text-red-600">{dbError}</p>
+        <Button
+          variant="secondary"
+          onClick={() => window.location.reload()}
+          className="mt-4"
+        >
           Retry
         </Button>
       </div>

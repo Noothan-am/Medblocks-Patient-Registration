@@ -1,32 +1,5 @@
-import { PGlite } from "@electric-sql/pglite";
+import { PGliteWorker } from "@electric-sql/pglite/worker";
 
-// Initialize PGlite
-const pglite = new PGlite();
-
-export async function initDatabase() {
-  try {
-    await pglite.query(`
-      CREATE TABLE IF NOT EXISTS patients (
-        id SERIAL PRIMARY KEY,
-        first_name VARCHAR(100) NOT NULL,
-        last_name VARCHAR(100) NOT NULL,
-        date_of_birth DATE NOT NULL,
-        gender VARCHAR(10) NOT NULL,
-        email VARCHAR(255),
-        phone VARCHAR(20),
-        address TEXT,
-        medical_history TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    console.log("Database initialized successfully");
-  } catch (error) {
-    console.error("Error initializing database:", error);
-    throw error;
-  }
-}
-
-// Patient type definition
 export interface Patient {
   id: number;
   first_name: string;
@@ -40,64 +13,160 @@ export interface Patient {
   created_at: string;
 }
 
-// Database operations
-export const db = {
-  async addPatient(patient: Omit<Patient, "id" | "created_at">) {
-    const result = await pglite.query(
-      `INSERT INTO patients (
-        first_name, last_name, date_of_birth, gender, 
-        email, phone, address, medical_history
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-      RETURNING *`,
-      [
-        patient.first_name,
-        patient.last_name,
-        patient.date_of_birth,
-        patient.gender,
-        patient.email,
-        patient.phone,
-        patient.address,
-        patient.medical_history,
-      ]
-    );
-    return result.rows[0] as Patient;
-  },
+interface QueryResult<T> {
+  rows: T[];
+  rowCount: number;
+}
 
-  async getPatients() {
-    const result = await pglite.query(
-      "SELECT * FROM patients ORDER BY created_at DESC"
-    );
-    return result.rows as Patient[];
-  },
+interface TableCheckResult {
+  exists: boolean;
+}
 
-  async getPatient(id: number) {
-    const result = await pglite.query("SELECT * FROM patients WHERE id = $1", [
-      id,
-    ]);
-    return result.rows[0] as Patient | undefined;
-  },
+let dbInstance: PGliteWorker | null = null;
+let isInitializing = false;
 
-  async updatePatient(
-    id: number,
-    patient: Partial<Omit<Patient, "id" | "created_at">>
-  ) {
-    const fields = Object.keys(patient);
-    const values = Object.values(patient);
-    const setClause = fields
-      .map((field, i) => `${field} = $${i + 2}`)
-      .join(", ");
+const initSchema = async (database: PGliteWorker) => {
+  try {
+    // Check if table exists
+    const tableCheck = await database.query<TableCheckResult>(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'patients'
+      ) as exists;
+    `);
 
-    const result = await pglite.query(
-      `UPDATE patients SET ${setClause} WHERE id = $1 RETURNING *`,
-      [id, ...values]
-    );
-    return result.rows[0] as Patient;
-  },
+    const tableExists = tableCheck.rows[0]?.exists;
 
-  async deletePatient(id: number) {
-    await pglite.query("DELETE FROM patients WHERE id = $1", [id]);
-  },
+    if (!tableExists) {
+      console.log("Creating patients table...");
+      // Create table with updated schema
+      await database.query(`
+        CREATE TABLE patients (
+          id SERIAL PRIMARY KEY,
+          first_name TEXT NOT NULL,
+          last_name TEXT NOT NULL,
+          date_of_birth TEXT NOT NULL,
+          gender TEXT NOT NULL,
+          email TEXT,
+          phone TEXT,
+          address TEXT,
+          medical_history TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      await database.query(`
+        CREATE INDEX IF NOT EXISTS idx_patient_name ON patients (last_name, first_name);
+      `);
+      console.log("Database schema initialized");
+    } else {
+      console.log("Patients table already exists");
+    }
+  } catch (error) {
+    console.error("Error initializing schema:", error);
+    throw error;
+  }
 };
 
-// Initialize database when the module is imported
-initDatabase().catch(console.error);
+export const initDatabase = async (): Promise<PGliteWorker> => {
+  if (isInitializing) {
+    // Wait for initialization to complete
+    while (isInitializing) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    return dbInstance!;
+  }
+
+  if (!dbInstance) {
+    isInitializing = true;
+    try {
+      console.log("Initializing database...");
+      const workerInstance = new Worker(
+        new URL("/pglite-worker.js", import.meta.url),
+        {
+          type: "module",
+        }
+      );
+      dbInstance = new PGliteWorker(workerInstance);
+
+      // Wait a bit to ensure worker is ready
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      await initSchema(dbInstance);
+      console.log("Database initialization complete");
+    } catch (error) {
+      console.error("Failed to initialize database:", error);
+      dbInstance = null;
+      throw error;
+    } finally {
+      isInitializing = false;
+    }
+  }
+  return dbInstance;
+};
+
+// Create and export the database interface
+export const db = {
+  async addPatient(
+    patientData: Omit<Patient, "id" | "created_at">
+  ): Promise<Patient> {
+    const database = await initDatabase();
+    const result = await database.query<Patient>(
+      `INSERT INTO patients 
+        (first_name, last_name, date_of_birth, gender, email, phone, address, medical_history) 
+       VALUES 
+        ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [
+        patientData.first_name,
+        patientData.last_name,
+        patientData.date_of_birth,
+        patientData.gender,
+        patientData.email || null,
+        patientData.phone || null,
+        patientData.address || null,
+        patientData.medical_history || null,
+      ]
+    );
+    return result.rows[0];
+  },
+
+  async getPatients(): Promise<Patient[]> {
+    const database = await initDatabase();
+    try {
+      const result = await database.query<Patient>(
+        "SELECT * FROM patients ORDER BY last_name, first_name"
+      );
+      return result.rows;
+    } catch (error) {
+      console.error("Error executing getPatients query:", error);
+      throw error;
+    }
+  },
+
+  async deletePatient(id: number): Promise<void> {
+    const database = await initDatabase();
+    try {
+      await database.query("DELETE FROM patients WHERE id = $1", [id]);
+    } catch (error) {
+      console.error("Error executing deletePatient query:", error);
+      throw error;
+    }
+  },
+
+  async searchPatients(searchTerm: string): Promise<Patient[]> {
+    const database = await initDatabase();
+    try {
+      const result = await database.query<Patient>(
+        `SELECT * FROM patients
+         WHERE first_name ILIKE $1 OR last_name ILIKE $2
+         ORDER BY last_name, first_name`,
+        [`%${searchTerm}%`, `%${searchTerm}%`]
+      );
+      return result.rows;
+    } catch (error) {
+      console.error("Error executing searchPatients query:", error);
+      throw error;
+    }
+  },
+};
