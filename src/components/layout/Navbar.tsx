@@ -19,6 +19,12 @@ export const Navbar: React.FC = () => {
             >
               Add Patient
             </Link>
+            <Link
+              to="/sql-query"
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+            >
+              SQL Query
+            </Link>
           </div>
         </div>
       </div>
