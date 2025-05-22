@@ -4,6 +4,7 @@ import { Input } from "./ui/Input";
 import type { Patient } from "../lib/db";
 import { db } from "../lib/db";
 import { usePGliteContext } from "../context/PGliteContext";
+import { useTabSync } from "../context/TabSyncContext";
 
 interface PatientListProps {
   onPatientDelete?: (patientId: number) => void;
@@ -21,6 +22,7 @@ export const PatientList: React.FC<PatientListProps> = ({
     isLoading: isDbLoading,
     error: dbError,
   } = usePGliteContext();
+  const { broadcastEvent } = useTabSync();
 
   const loadPatients = async () => {
     if (!isInitialized) return;
@@ -44,6 +46,25 @@ export const PatientList: React.FC<PatientListProps> = ({
     }
   }, [isInitialized]);
 
+  // Listen for tab sync events
+  useEffect(() => {
+    const handleTabSync = (event: CustomEvent) => {
+      const { type } = event.detail;
+      if (
+        type === "PATIENT_ADDED" ||
+        type === "PATIENT_DELETED" ||
+        type === "PATIENTS_UPDATED"
+      ) {
+        loadPatients();
+      }
+    };
+
+    window.addEventListener("tabSync", handleTabSync as EventListener);
+    return () => {
+      window.removeEventListener("tabSync", handleTabSync as EventListener);
+    };
+  }, [isInitialized]);
+
   const handleDelete = async (patientId: number) => {
     if (!window.confirm("Are you sure you want to delete this patient?")) {
       return;
@@ -52,6 +73,7 @@ export const PatientList: React.FC<PatientListProps> = ({
     try {
       await db.deletePatient(patientId);
       await loadPatients();
+      broadcastEvent({ type: "PATIENT_DELETED", data: { patientId } });
       onPatientDelete?.(patientId);
     } catch (err) {
       console.error("Error deleting patient:", err);

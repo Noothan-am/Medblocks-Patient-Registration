@@ -4,16 +4,19 @@ import { PatientForm } from "../components/PatientForm";
 import type { Patient } from "../lib/db";
 import { db } from "../lib/db";
 import { usePGliteContext } from "../context/PGliteContext";
+import { useTabSync } from "../context/TabSyncContext";
 
 export const NewPatientPage: React.FC = () => {
   const navigate = useNavigate();
   const { isInitialized, isLoading, error } = usePGliteContext();
+  const { broadcastEvent } = useTabSync();
 
   const handleSubmit = async (patient: Omit<Patient, "id" | "created_at">) => {
     if (!isInitialized) {
       throw new Error("Database not initialized");
     }
-    await db.addPatient(patient);
+    const newPatient = await db.addPatient(patient);
+    broadcastEvent({ type: "PATIENT_ADDED", data: { patient: newPatient } });
     navigate("/");
   };
 
