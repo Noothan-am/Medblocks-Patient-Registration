@@ -22,7 +22,7 @@ export const PatientList: React.FC<PatientListProps> = ({
     isLoading: isDbLoading,
     error: dbError,
   } = usePGliteContext();
-  const { broadcastEvent } = useTabSync();
+  const { broadcastEvent, isConnected, connectedTabs } = useTabSync();
 
   const loadPatients = async () => {
     if (!isInitialized) return;
@@ -117,7 +117,21 @@ export const PatientList: React.FC<PatientListProps> = ({
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Patients</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-semibold">Patients</h2>
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div
+              className={`w-2 h-2 rounded-full ${
+                isConnected ? "bg-green-500" : "bg-red-500"
+              }`}
+            />
+            <span>
+              {connectedTabs === 1
+                ? "Single tab mode"
+                : `${connectedTabs} tabs connected`}
+            </span>
+          </div>
+        </div>
         <Input
           type="search"
           placeholder="Search patients..."
