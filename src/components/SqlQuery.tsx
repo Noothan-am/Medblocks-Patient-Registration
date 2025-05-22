@@ -1,17 +1,78 @@
 import React, { useState } from "react";
 
-interface SqlQueryProps {
-  onExecuteQuery?: (query: string) => void;
+interface QueryResult {
+  rows: any[];
+  rowCount: number;
+  fields?: { name: string; dataTypeID: number }[];
 }
 
-const SqlQuery: React.FC<SqlQueryProps> = ({ onExecuteQuery }) => {
+interface SqlQueryProps {
+  onExecuteQuery: (query: string) => void;
+  queryResult: QueryResult | null;
+  error: string | null;
+  isExecuting: boolean;
+}
+
+const SqlQuery: React.FC<SqlQueryProps> = ({
+  onExecuteQuery,
+  queryResult,
+  error,
+  isExecuting,
+}) => {
   const [query, setQuery] = useState<string>("");
-  const [isExecuting, setIsExecuting] = useState<boolean>(false);
 
   const handleExecute = () => {
     if (!query.trim()) return;
-    setIsExecuting(true);
-    onExecuteQuery?.(query);
+    onExecuteQuery(query);
+  };
+
+  const renderResults = () => {
+    if (!queryResult) return null;
+
+    if (queryResult.rows.length === 0) {
+      return (
+        <div className="text-gray-500 text-sm">
+          Query executed successfully. No rows returned.
+        </div>
+      );
+    }
+
+    return (
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              {queryResult.fields?.map((field) => (
+                <th
+                  key={field.name}
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                >
+                  {field.name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {queryResult.rows.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {queryResult.fields?.map((field) => (
+                  <td
+                    key={`${rowIndex}-${field.name}`}
+                    className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
+                  >
+                    {row[field.name]?.toString() ?? "null"}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="mt-2 text-sm text-gray-500">
+          {queryResult.rowCount} row{queryResult.rowCount !== 1 ? "s" : ""}{" "}
+          returned
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -21,6 +82,7 @@ const SqlQuery: React.FC<SqlQueryProps> = ({ onExecuteQuery }) => {
           SQL Query Editor
         </h2>
 
+        {/* Query Input Area */}
         <div className="mb-4">
           <label
             htmlFor="sqlQuery"
@@ -37,6 +99,7 @@ const SqlQuery: React.FC<SqlQueryProps> = ({ onExecuteQuery }) => {
           />
         </div>
 
+        {/* Execute Button */}
         <button
           onClick={handleExecute}
           disabled={isExecuting || !query.trim()}
@@ -49,17 +112,25 @@ const SqlQuery: React.FC<SqlQueryProps> = ({ onExecuteQuery }) => {
           {isExecuting ? "Executing..." : "Execute Query"}
         </button>
 
+        {/* Error Display */}
+        {error && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
+            <h3 className="text-sm font-medium text-red-800">Error</h3>
+            <p className="mt-2 text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        {/* Results Area */}
         <div className="mt-6">
           <h3 className="text-lg font-medium text-gray-800 mb-2">
             Query Results
           </h3>
           <div className="bg-gray-50 rounded-md border border-gray-200 p-4 min-h-[200px]">
-            <div className="text-gray-500 text-sm">
-              <p>Query results will appear here...</p>
-            </div>
+            {renderResults()}
           </div>
         </div>
 
+        {/* Query Status */}
         <div className="mt-4 text-sm text-gray-600">
           <p>
             Note: Please ensure your SQL query is properly formatted and safe to
