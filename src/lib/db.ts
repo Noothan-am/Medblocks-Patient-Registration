@@ -4,11 +4,14 @@ export interface Patient {
   id: number;
   first_name: string;
   last_name: string;
+  preferred_name?: string;
   date_of_birth: string;
   gender: string;
   email?: string;
   phone?: string;
   address?: string;
+  state?: string;
+  city?: string;
   medical_history?: string;
   created_at: string;
 }
@@ -45,11 +48,14 @@ const initSchema = async (database: PGliteWorker) => {
           id SERIAL PRIMARY KEY,
           first_name TEXT NOT NULL,
           last_name TEXT NOT NULL,
+          preferred_name TEXT,
           date_of_birth TEXT NOT NULL,
           gender TEXT NOT NULL,
           email TEXT,
           phone TEXT,
           address TEXT,
+          state TEXT,
+          city TEXT,
           medical_history TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -113,18 +119,21 @@ export const db = {
     const database = await initDatabase();
     const result = await database.query<Patient>(
       `INSERT INTO patients 
-        (first_name, last_name, date_of_birth, gender, email, phone, address, medical_history) 
+        (first_name, last_name, preferred_name, date_of_birth, gender, email, phone, address, state, city, medical_history) 
        VALUES 
-        ($1, $2, $3, $4, $5, $6, $7, $8)
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [
         patientData.first_name,
         patientData.last_name,
+        patientData.preferred_name || null,
         patientData.date_of_birth,
         patientData.gender,
         patientData.email || null,
         patientData.phone || null,
         patientData.address || null,
+        patientData.state || null,
+        patientData.city || null,
         patientData.medical_history || null,
       ]
     );
