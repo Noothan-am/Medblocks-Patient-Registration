@@ -14,12 +14,14 @@ interface PatientModalProps {
   patient: Patient | null;
   isOpen: boolean;
   onClose: () => void;
+  onDelete?: (patientId: number) => void;
 }
 
 const PatientModal: React.FC<PatientModalProps> = ({
   patient,
   isOpen,
   onClose,
+  onDelete,
 }) => {
   if (!isOpen || !patient) return null;
 
@@ -213,7 +215,7 @@ const PatientModal: React.FC<PatientModalProps> = ({
                     "Are you sure you want to delete this patient?"
                   )
                 ) {
-                  // Handle delete
+                  onDelete?.(patient.id);
                   onClose();
                 }
               }}
@@ -285,10 +287,6 @@ export const PatientList: React.FC<PatientListProps> = ({
   }, [isInitialized]);
 
   const handleDelete = async (patientId: number) => {
-    if (!window.confirm("Are you sure you want to delete this patient?")) {
-      return;
-    }
-
     try {
       await db.deletePatient(patientId);
       await loadPatients();
@@ -452,6 +450,7 @@ export const PatientList: React.FC<PatientListProps> = ({
         patient={selectedPatient}
         isOpen={!!selectedPatient}
         onClose={() => setSelectedPatient(null)}
+        onDelete={handleDelete}
       />
     </div>
   );
