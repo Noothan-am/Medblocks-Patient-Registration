@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
+import { Select } from "./ui/Select";
 import { db } from "../lib/db";
 import type { Patient } from "../lib/db";
 
@@ -46,6 +47,9 @@ export const PatientForm: React.FC<PatientFormProps> = ({
     }
     if (!formData.date_of_birth) {
       newErrors.date_of_birth = "Date of birth is required";
+    }
+    if (!formData.gender) {
+      newErrors.gender = "Gender is required";
     }
     if (!formData.phone.trim()) {
       newErrors.phone = "Phone is required";
@@ -163,6 +167,21 @@ export const PatientForm: React.FC<PatientFormProps> = ({
               error={errors.date_of_birth}
               placeholder="Select date"
               required
+            />
+            <Select
+              label="Gender*"
+              name="gender"
+              value={formData.gender}
+              onChange={handleChange}
+              error={errors.gender}
+              required
+              options={[
+                { value: "", label: "Select gender" },
+                { value: "male", label: "Male" },
+                { value: "female", label: "Female" },
+                { value: "other", label: "Other" },
+                { value: "prefer_not_to_say", label: "Prefer not to say" },
+              ]}
             />
             <Input
               label="Phone*"
