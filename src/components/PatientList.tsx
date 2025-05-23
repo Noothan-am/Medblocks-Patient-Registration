@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { toast } from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import type { Patient } from "../lib/db";
@@ -255,7 +257,12 @@ export const PatientList: React.FC<PatientListProps> = ({
       setError(null);
     } catch (err) {
       console.error("Error loading patients:", err);
-      setError("Failed to load patients. Please try again.");
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Failed to load patients. Please try again.";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -287,14 +294,28 @@ export const PatientList: React.FC<PatientListProps> = ({
   }, [isInitialized]);
 
   const handleDelete = async (patientId: number) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this patient? This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+
     try {
       await db.deletePatient(patientId);
       await loadPatients();
       broadcastEvent({ type: "PATIENT_DELETED", data: { patientId } });
       onPatientDelete?.(patientId);
+      toast.success("Patient deleted successfully");
     } catch (err) {
       console.error("Error deleting patient:", err);
-      setError("Failed to delete patient. Please try again.");
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Failed to delete patient. Please try again.";
+      setError(errorMessage);
+      toast.error(errorMessage);
     }
   };
 

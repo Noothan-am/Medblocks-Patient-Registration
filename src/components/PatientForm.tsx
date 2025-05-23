@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { toast } from "react-hot-toast";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import { Select } from "./ui/Select";
@@ -69,12 +70,14 @@ export const PatientForm: React.FC<PatientFormProps> = ({
     e.preventDefault();
 
     if (!validateForm()) {
+      toast.error("Please fix the form errors before submitting");
       return;
     }
 
     setIsSubmitting(true);
     try {
       await onSubmit(formData);
+      toast.success("Patient information saved successfully");
       setFormData({
         first_name: "",
         last_name: "",
@@ -91,27 +94,45 @@ export const PatientForm: React.FC<PatientFormProps> = ({
       setErrors({});
     } catch (error) {
       console.error("Error submitting form:", error);
-      setErrors({ submit: "Failed to submit form. Please try again." });
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to submit form. Please try again.";
+      toast.error(errorMessage);
+      setErrors({ submit: errorMessage });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleCancel = () => {
-    setFormData({
-      first_name: "",
-      last_name: "",
-      preferred_name: "",
-      date_of_birth: "",
-      gender: "",
-      email: "",
-      phone: "",
-      address: "",
-      state: "",
-      city: "",
-      medical_history: "",
-    });
-    setErrors({});
+    if (
+      Object.keys(formData).some(
+        (key) => formData[key as keyof typeof formData]
+      )
+    ) {
+      if (
+        window.confirm(
+          "Are you sure you want to cancel? Any unsaved changes will be lost."
+        )
+      ) {
+        setFormData({
+          first_name: "",
+          last_name: "",
+          preferred_name: "",
+          date_of_birth: "",
+          gender: "",
+          email: "",
+          phone: "",
+          address: "",
+          state: "",
+          city: "",
+          medical_history: "",
+        });
+        setErrors({});
+        toast.success("Form cleared");
+      }
+    }
   };
 
   const handleChange = (

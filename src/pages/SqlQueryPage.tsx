@@ -1,5 +1,6 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
+import { toast } from "react-hot-toast";
 import { initDatabase } from "../lib/db";
 import { usePGliteContext } from "../context/PGliteContext";
 import type { Results } from "@electric-sql/pglite";
@@ -19,12 +20,17 @@ const SqlQueryPage = () => {
 
   const handleQuerySubmit = async () => {
     if (!isInitialized) {
-      setError("Database is not initialized. Please wait or refresh the page.");
+      const errorMessage =
+        "Database is not initialized. Please wait or refresh the page.";
+      setError(errorMessage);
+      toast.error(errorMessage);
       return;
     }
 
     if (!query.trim()) {
-      setError("Please enter a SQL query.");
+      const errorMessage = "Please enter a SQL query.";
+      setError(errorMessage);
+      toast.error(errorMessage);
       return;
     }
 
@@ -48,13 +54,18 @@ const SqlQueryPage = () => {
         rows: result.rows,
         rowCount: result.rowCount ?? result.rows.length,
       });
+
+      toast.success(
+        `Query executed successfully. ${result.rows.length} rows returned.`
+      );
     } catch (err) {
       console.error("Query execution error:", err);
-      setError(
+      const errorMessage =
         err instanceof Error
           ? err.message
-          : "An error occurred while executing the query"
-      );
+          : "An error occurred while executing the query";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -68,7 +79,10 @@ const SqlQueryPage = () => {
             <h2 className="text-lg font-medium text-red-800">Database Error</h2>
             <p className="mt-2 text-sm text-red-700">{dbError}</p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                window.location.reload();
+                toast.success("Refreshing page...");
+              }}
               className="mt-4 px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors duration-200"
             >
               Retry Connection
