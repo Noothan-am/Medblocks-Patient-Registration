@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import type { Patient } from "../lib/db";
@@ -236,35 +235,24 @@ export const PatientList: React.FC<PatientListProps> = ({
   onPatientDelete,
 }) => {
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const {
-    isInitialized,
-    isLoading: isDbLoading,
-    error: dbError,
-  } = usePGliteContext();
-  const { broadcastEvent, isConnected, connectedTabs } = useTabSync();
+  const [searchQuery, setSearchQuery] = useState("");
+  const { broadcastEvent } = useTabSync();
+  const { isInitialized } = usePGliteContext();
 
   const loadPatients = async () => {
     if (!isInitialized) return;
 
     try {
-      setIsLoading(true);
       const data = await db.getPatients();
       setPatients(data);
-      setError(null);
     } catch (err) {
       console.error("Error loading patients:", err);
       const errorMessage =
         err instanceof Error
           ? err.message
           : "Failed to load patients. Please try again.";
-      setError(errorMessage);
       toast.error(errorMessage);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -291,7 +279,7 @@ export const PatientList: React.FC<PatientListProps> = ({
     return () => {
       window.removeEventListener("tabSync", handleTabSync as EventListener);
     };
-  }, [isInitialized]);
+  }, []);
 
   const handleDelete = async (patientId: number) => {
     if (
@@ -314,43 +302,19 @@ export const PatientList: React.FC<PatientListProps> = ({
         err instanceof Error
           ? err.message
           : "Failed to delete patient. Please try again.";
-      setError(errorMessage);
       toast.error(errorMessage);
     }
   };
 
   const filteredPatients = patients.filter((patient) => {
-    const searchLower = searchTerm.toLowerCase();
+    const searchLower = searchQuery.toLowerCase();
     return (
       patient.first_name.toLowerCase().includes(searchLower) ||
       patient.last_name.toLowerCase().includes(searchLower) ||
       patient.email?.toLowerCase().includes(searchLower) ||
-      patient.phone?.includes(searchTerm)
+      patient.phone?.includes(searchQuery)
     );
   });
-
-  if (isDbLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-black border-t-transparent"></div>
-      </div>
-    );
-  }
-
-  if (dbError) {
-    return (
-      <div className="text-center p-8 bg-white rounded-lg shadow-lg max-w-md mx-auto">
-        <p className="text-red-600 text-lg mb-4">{dbError}</p>
-        <Button
-          variant="secondary"
-          onClick={() => window.location.reload()}
-          className="bg-black text-white hover:bg-gray-800 transition-colors"
-        >
-          Retry
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -365,8 +329,8 @@ export const PatientList: React.FC<PatientListProps> = ({
             <Input
               type="search"
               placeholder="Search patients..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-gray-50 border-gray-200 focus:border-black focus:ring-black"
             />
           </div>
@@ -389,12 +353,12 @@ export const PatientList: React.FC<PatientListProps> = ({
                 />
               </svg>
               <h3 className="mt-4 text-lg font-medium text-gray-900">
-                {searchTerm
+                {searchQuery
                   ? "No patients found"
                   : "No patients registered yet"}
               </h3>
               <p className="mt-2 text-sm text-gray-500">
-                {searchTerm
+                {searchQuery
                   ? "Try adjusting your search terms"
                   : "Get started by registering a new patient"}
               </p>

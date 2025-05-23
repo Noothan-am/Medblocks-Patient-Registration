@@ -16,11 +16,6 @@ export interface Patient {
   created_at: string;
 }
 
-interface QueryResult<T> {
-  rows: T[];
-  rowCount: number;
-}
-
 interface TableCheckResult {
   exists: boolean;
 }
@@ -60,7 +55,7 @@ const initSchema = async (database: PGliteWorker) => {
           ),
           phone TEXT UNIQUE CHECK (
             phone IS NULL OR 
-            phone ~ '^\+?[1-9]\d{1,14}$'
+            phone ~ '^[+]?[0-9]{10,15}$'
           ),
           address TEXT CHECK (length(address) <= 200),
           state TEXT CHECK (length(state) <= 100),
@@ -73,7 +68,7 @@ const initSchema = async (database: PGliteWorker) => {
           ),
           CONSTRAINT valid_phone_format CHECK (
             phone IS NULL OR 
-            phone ~ '^\+?[1-9]\d{1,14}$'
+            phone ~ '^[+]?[0-9]{10,15}$'
           )
         );
       `);
@@ -197,10 +192,10 @@ const validatePatientInput = (input: PatientInput): void => {
 
   // Phone validation
   if (input.phone) {
-    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    const phoneRegex = /^[+]?[0-9]{10,15}$/;
     if (!phoneRegex.test(input.phone)) {
       throw new ValidationError(
-        "Invalid phone number format. Must be a valid international number"
+        "Invalid phone number format. Must be 10-15 digits with optional + prefix"
       );
     }
   }

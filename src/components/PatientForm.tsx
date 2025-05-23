@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { toast } from "react-hot-toast";
-import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import { Select } from "./ui/Select";
-import { db, type PatientInput, ValidationError } from "../lib/db";
+import { ValidationError } from "../lib/db";
+import type { PatientInput } from "../lib/db";
 
 interface PatientFormProps {
   onSubmit: (patient: PatientInput) => Promise<void>;
@@ -143,7 +143,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({
         medical_history: "",
       });
       setErrors({});
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error submitting form:", error);
       let errorMessage = "Failed to submit form. Please try again.";
 
@@ -151,13 +151,13 @@ export const PatientForm: React.FC<PatientFormProps> = ({
         errorMessage = error.message;
         // Map validation error to specific field if possible
         if (error.message.includes("email")) {
-          setErrors((prev) => ({ ...prev, email: error.message }));
+          setErrors((prev) => ({ ...prev, email: errorMessage }));
         } else if (error.message.includes("phone")) {
-          setErrors((prev) => ({ ...prev, phone: error.message }));
+          setErrors((prev) => ({ ...prev, phone: errorMessage }));
         } else if (error.message.includes("date of birth")) {
-          setErrors((prev) => ({ ...prev, date_of_birth: error.message }));
+          setErrors((prev) => ({ ...prev, date_of_birth: errorMessage }));
         } else if (error.message.includes("gender")) {
-          setErrors((prev) => ({ ...prev, gender: error.message }));
+          setErrors((prev) => ({ ...prev, gender: errorMessage }));
         }
       } else if (error instanceof Error) {
         errorMessage = error.message;
