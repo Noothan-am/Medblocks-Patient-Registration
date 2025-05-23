@@ -3,26 +3,27 @@ import { toast } from "react-hot-toast";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import { Select } from "./ui/Select";
-import { db } from "../lib/db";
-import type { Patient } from "../lib/db";
+import { db, type PatientInput, ValidationError } from "../lib/db";
 
 interface PatientFormProps {
-  onSubmit: (patient: Omit<Patient, "id" | "created_at">) => Promise<void>;
-  initialData?: Partial<Patient>;
+  onSubmit: (patient: PatientInput) => Promise<void>;
+  initialData?: Partial<PatientInput>;
   submitLabel?: string;
 }
+
+type Gender = "male" | "female" | "other" | "prefer_not_to_say";
 
 export const PatientForm: React.FC<PatientFormProps> = ({
   onSubmit,
   initialData = {},
   submitLabel = "Save",
 }) => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<PatientInput>({
     first_name: initialData.first_name || "",
     last_name: initialData.last_name || "",
     preferred_name: initialData.preferred_name || "",
     date_of_birth: initialData.date_of_birth || "",
-    gender: initialData.gender || "",
+    gender: (initialData.gender as Gender) || "prefer_not_to_say",
     email: initialData.email || "",
     phone: initialData.phone || "",
     address: initialData.address || "",
@@ -37,29 +38,80 @@ export const PatientForm: React.FC<PatientFormProps> = ({
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.first_name.trim()) {
+    // Required field validation
+    if (!formData.first_name?.trim()) {
       newErrors.first_name = "First name is required";
+    } else if (formData.first_name.length > 100) {
+      newErrors.first_name = "First name must be 100 characters or less";
     }
-    if (!formData.last_name.trim()) {
+
+    if (!formData.last_name?.trim()) {
       newErrors.last_name = "Last name is required";
+    } else if (formData.last_name.length > 100) {
+      newErrors.last_name = "Last name must be 100 characters or less";
     }
-    if (!formData.preferred_name.trim()) {
-      newErrors.preferred_name = "Preferred name is required";
+
+    if (formData.preferred_name && formData.preferred_name.length > 100) {
+      newErrors.preferred_name =
+        "Preferred name must be 100 characters or less";
     }
+
     if (!formData.date_of_birth) {
       newErrors.date_of_birth = "Date of birth is required";
+    } else {
+      const dob = new Date(formData.date_of_birth);
+      const today = new Date();
+      const minDate = new Date();
+      minDate.setFullYear(today.getFullYear() - 120);
+
+      if (isNaN(dob.getTime())) {
+        newErrors.date_of_birth = "Invalid date format";
+      } else if (dob > today) {
+        newErrors.date_of_birth = "Date of birth cannot be in the future";
+      } else if (dob < minDate) {
+        newErrors.date_of_birth =
+          "Date of birth cannot be more than 120 years ago";
+      }
     }
+
     if (!formData.gender) {
       newErrors.gender = "Gender is required";
+    } else if (
+      !["male", "female", "other", "prefer_not_to_say"].includes(
+        formData.gender
+      )
+    ) {
+      newErrors.gender = "Invalid gender value";
     }
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Phone is required";
+
+    // Email validation
+    if (formData.email) {
+      const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/i;
+      if (!emailRegex.test(formData.email)) {
+        newErrors.email = "Invalid email format";
+      }
     }
-    if (!formData.address.trim()) {
-      newErrors.address = "Address is required";
+
+    // Phone validation
+    if (formData.phone) {
+      const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+      if (!phoneRegex.test(formData.phone)) {
+        newErrors.phone =
+          "Invalid phone number format. Must be a valid international number";
+      }
     }
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Invalid email address";
+
+    // Address validation
+    if (formData.address && formData.address.length > 200) {
+      newErrors.address = "Address must be 200 characters or less";
+    }
+
+    if (formData.state && formData.state.length > 100) {
+      newErrors.state = "State must be 100 characters or less";
+    }
+
+    if (formData.city && formData.city.length > 100) {
+      newErrors.city = "City must be 100 characters or less";
     }
 
     setErrors(newErrors);
@@ -77,13 +129,12 @@ export const PatientForm: React.FC<PatientFormProps> = ({
     setIsSubmitting(true);
     try {
       await onSubmit(formData);
-      toast.success("Patient information saved successfully");
       setFormData({
         first_name: "",
         last_name: "",
         preferred_name: "",
         date_of_birth: "",
-        gender: "",
+        gender: "prefer_not_to_say",
         email: "",
         phone: "",
         address: "",
@@ -94,12 +145,26 @@ export const PatientForm: React.FC<PatientFormProps> = ({
       setErrors({});
     } catch (error) {
       console.error("Error submitting form:", error);
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to submit form. Please try again.";
+      let errorMessage = "Failed to submit form. Please try again.";
+
+      if (error instanceof ValidationError) {
+        errorMessage = error.message;
+        // Map validation error to specific field if possible
+        if (error.message.includes("email")) {
+          setErrors((prev) => ({ ...prev, email: error.message }));
+        } else if (error.message.includes("phone")) {
+          setErrors((prev) => ({ ...prev, phone: error.message }));
+        } else if (error.message.includes("date of birth")) {
+          setErrors((prev) => ({ ...prev, date_of_birth: error.message }));
+        } else if (error.message.includes("gender")) {
+          setErrors((prev) => ({ ...prev, gender: error.message }));
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
       toast.error(errorMessage);
-      setErrors({ submit: errorMessage });
+      setErrors((prev) => ({ ...prev, submit: errorMessage }));
     } finally {
       setIsSubmitting(false);
     }
@@ -121,7 +186,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({
           last_name: "",
           preferred_name: "",
           date_of_birth: "",
-          gender: "",
+          gender: "prefer_not_to_say",
           email: "",
           phone: "",
           address: "",
