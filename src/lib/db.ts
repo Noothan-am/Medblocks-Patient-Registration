@@ -73,11 +73,19 @@ const initSchema = async (database: PGliteWorker) => {
         );
       `);
 
+      // Create indexes separately
       await database.query(`
         CREATE INDEX IF NOT EXISTS idx_patient_name ON patients (last_name, first_name);
+      `);
+
+      await database.query(`
         CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_email ON patients (email) WHERE email IS NOT NULL;
+      `);
+
+      await database.query(`
         CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_phone ON patients (phone) WHERE phone IS NOT NULL;
       `);
+
       console.log("Database schema initialized with constraints");
     } else {
       console.log("Patients table already exists");
